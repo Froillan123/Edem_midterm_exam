@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List CRUD</title>
+    <style>
+        /* Reset default margin and padding */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f9fc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            border-color: #3498db;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .task-list {
+            margin-top: 20px;
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .task-item {
+            background-color: #fff;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .task-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .task-item div {
+            flex: 1;
+        }
+
+        .task-item .task-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .task-item button {
+            padding: 8px;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .task-item button.edit {
+            background-color: #3498db;
+        }
+
+        .task-item button.delete {
+            background-color: #e74c3c;
+        }
+
+        .task-item button:hover {
+            background-color: #2980b9;
+        }
+
+        .task-item button.delete:hover {
+            background-color: #c0392b;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                max-width: 90%;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .task-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .task-item button {
+                width: 100%;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Todo List</h1>
+        <input type="text" id="taskName" placeholder="Task Name" />
+        <textarea id="taskDescription" rows="4" placeholder="Task Description"></textarea>
+        <button id="taskButton" onclick="addOrUpdateTask()">Add Task</button>
+
+        <ul id="taskList" class="task-list"></ul>
+    </div>
+
+    <script>
+        let editingTaskId = null;
+
+        // Function to fetch all tasks and render them
+        async function getTasks() {
+            const response = await fetch('http://localhost:3000/tasks');
+            const tasks = await response.json();
+            renderTasks(tasks);
+        }
+
+        // Function to render tasks
+        function renderTasks(tasks) {
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = ''; // Clear the current list
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.classList.add('task-item');
+                li.innerHTML = `
+                    <div>
+                        <strong>${task.name}</strong><br>
+                        <small>${task.description}</small>
+                    </div>
+                    <div class="task-buttons">
+                        <button class="edit" onclick="editTask(${task.id}, '${task.name}', '${task.description}')">Edit</button>
+                        <button class="delete" onclick="confirmDelete(${task.id})">Delete</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        // Function to add or update a task
+        async function addOrUpdateTask() {
+            const name = document.getElementById('taskName').value;
+            const description = document.getElementById('taskDescription').value;
+            if (name && description) {
+                if (editingTaskId) {
+                    // Update existing task
+                    const response = await fetch(`http://localhost:3000/tasks/${editingTaskId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name, description })
+                    });
+                    if (response.ok) {
+                        editingTaskId = null;
+                        document.getElementById('taskButton').textContent = 'Add Task';
+                        getTasks();  // Reload tasks
+                        document.getElementById('taskName').value = '';
+                        document.getElementById('taskDescription').value = '';
+                    }
+                } else {
+                    // Add new task
+                    const response = await fetch('http://localhost:3000/tasks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name, description })
+                    });
+                    if (response.ok) {
+                        getTasks();  // Reload tasks
+                        document.getElementById('taskName').value = '';
+                        document.getElementById('taskDescription').value = '';
+                    }
+                }
+            } else {
+                alert('Please provide both task name and description!');
+            }
+        }
+
+        // Function to edit a task
+        function editTask(id, name, description) {
+            editingTaskId = id;
+            document.getElementById('taskName').value = name;
+            document.getElementById('taskDescription').value = description;
+            document.getElementById('taskButton').textContent = 'Save Task';
+        }
+
+        // Function to confirm before deleting a task
+        function confirmDelete(id) {
+            const confirmation = confirm('Are you sure you want to delete this task?');
+            if (confirmation) {
+                deleteTask(id);
+            }
+        }
+
+        // Function to delete a task
+        async function deleteTask(id) {
+            const response = await fetch(`http://localhost:3000/tasks/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                getTasks();  // Reload tasks
+            }
+        }
+
+        // Initial load of tasks
+        getTasks();
+    </script>
+</body>
+
+</html>
